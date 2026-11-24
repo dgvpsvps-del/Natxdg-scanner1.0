@@ -22,7 +22,11 @@
  */
 
 #include <Arduino.h>
-#include <ESP8266WiFi.h>
+#if defined(ESP8266)
+  #include <ESP8266WiFi.h>
+#else
+  #include <WiFi.h>
+#endif
 #include <Wire.h>
 #include <EEPROM.h>
 #include <Adafruit_GFX.h>
@@ -30,7 +34,62 @@
 #include "logo.h"
 
 #define FW_NAME "Nat X Dg Scanner"
-#define FW_VER  "1.2"
+#define FW_VER  "1.3"
+
+// ---------- Pin per chip ----------
+// ESP8266 mengikuti skematik NETHERCAP. Untuk ESP32 pakai tabel di bawah
+// (ubah sesuai wiring kamu). Semua tombol ke GND (INPUT_PULLUP).
+#if defined(ESP8266)
+  #define CHIP_NAME "ESP8266"
+  #define PIN_SDA   D2
+  #define PIN_SCL   D1
+  #define PIN_UP    D5
+  #define PIN_DOWN  D6
+  #define PIN_OK    D7
+  #define PIN_BACK  D3
+  #define PIN_START D4
+  #define BAT_PIN   A0
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+  #define CHIP_NAME "ESP32-S3"
+  #define PIN_SDA   8
+  #define PIN_SCL   9
+  #define PIN_UP    4
+  #define PIN_DOWN  5
+  #define PIN_OK    6
+  #define PIN_BACK  7
+  #define PIN_START 15
+  #define BAT_PIN   1
+#elif defined(CONFIG_IDF_TARGET_ESP32C3)
+  #define CHIP_NAME "ESP32-C3"
+  #define PIN_SDA   6
+  #define PIN_SCL   7
+  #define PIN_UP    1
+  #define PIN_DOWN  3
+  #define PIN_OK    4
+  #define PIN_BACK  10
+  #define PIN_START 5
+  #define BAT_PIN   0
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+  #define CHIP_NAME "ESP32-C6"
+  #define PIN_SDA   6
+  #define PIN_SCL   7
+  #define PIN_UP    1
+  #define PIN_DOWN  2
+  #define PIN_OK    3
+  #define PIN_BACK  10
+  #define PIN_START 11
+  #define BAT_PIN   0
+#else
+  #define CHIP_NAME "ESP32"
+  #define PIN_SDA   21
+  #define PIN_SCL   22
+  #define PIN_UP    25
+  #define PIN_DOWN  26
+  #define PIN_OK    27
+  #define PIN_BACK  14
+  #define PIN_START 13
+  #define BAT_PIN   34
+#endif
 
 // ---------- OLED ----------
 #define SCREEN_W 128
@@ -39,19 +98,36 @@
 Adafruit_SSD1306 display(SCREEN_W, SCREEN_H, &Wire, -1);
 
 // ---------- Baterai ----------
-// Pembagi tegangan: Vbat -100k- A0 -100k- GND, ditambah pembagi bawaan D1 mini
-// (220k + 100k). Rasio ADC = 0.1351 x Vbat. Kalau angka baterai kurang pas,
-// ubah BAT_DIV (naikkan = tegangan terbaca lebih kecil).
-#define BAT_DIV 0.1351f
+// Pembagi tegangan: Vbat -100k- ADC -100k- GND.
+// ESP8266: ditambah pembagi bawaan D1 mini (220k+100k) -> rasio 0.1351 x Vbat.
+//          Kalau angka kurang pas, ubah BAT_DIV (naikkan = tegangan terbaca lebih kecil).
+// ESP32  : pembagi 2:1 (BAT_RATIO = 2.0), pakai analogReadMilliVolts (sudah terkalibrasi).
+#define BAT_DIV   0.1351f
+#define BAT_RATIO 2.0f
 float batVolt = 0;
+
+float batRead() {
+  long s = 0;
+  for (int i = 0; i < 8; i++) {
+#if defined(ESP8266)
+    s += analogRead(BAT_PIN);
+#else
+    s += analogReadMilliVolts(BAT_PIN);
+#endif
+    delay(1);
+  }
+#if defined(ESP8266)
+  return (s / 8.0f) / 1023.0f / BAT_DIV;
+#else
+  return (s / 8.0f) * BAT_RATIO / 1000.0f;
+#endif
+}
 
 void batUpdate(bool first) {
   static uint32_t t = 0;
   if (!first && millis() - t < 1000) return;
   t = millis();
-  long s = 0;
-  for (int i = 0; i < 8; i++) { s += analogRead(A0); delay(1); }
-  float v = (s / 8.0f) / 1023.0f / BAT_DIV;
+  float v = batRead();
   batVolt = first ? v : (batVolt * 0.7f + v * 0.3f);
 }
 
@@ -109,7 +185,7 @@ void applyBrightness() {
 
 // ---------- Tombol ----------
 enum { B_UP, B_DOWN, B_OK, B_BACK, B_START, B_COUNT };
-const uint8_t BTN_PIN[B_COUNT] = { D5, D6, D7, D3, D4 };
+const uint8_t BTN_PIN[B_COUNT] = { PIN_UP, PIN_DOWN, PIN_OK, PIN_BACK, PIN_START };
 bool     btnState[B_COUNT];
 uint32_t btnSince[B_COUNT];
 uint32_t btnRepeat[B_COUNT];
@@ -172,6 +248,7 @@ uint32_t liveDrawAt = 0;
 
 // ---------- Util ----------
 const char* encName(uint8_t e) {
+#if defined(ESP8266)
   switch (e) {
     case ENC_TYPE_NONE: return "OPEN";
     case ENC_TYPE_WEP:  return "WEP";
@@ -180,6 +257,19 @@ const char* encName(uint8_t e) {
     case ENC_TYPE_AUTO: return "WPA/WPA2";
     default:            return "?";
   }
+#else
+  switch (e) {
+    case WIFI_AUTH_OPEN:            return "OPEN";
+    case WIFI_AUTH_WEP:             return "WEP";
+    case WIFI_AUTH_WPA_PSK:         return "WPA";
+    case WIFI_AUTH_WPA2_PSK:        return "WPA2";
+    case WIFI_AUTH_WPA_WPA2_PSK:    return "WPA/WPA2";
+    case WIFI_AUTH_WPA2_ENTERPRISE: return "WPA2-E";
+    case WIFI_AUTH_WPA3_PSK:        return "WPA3";
+    case WIFI_AUTH_WPA2_WPA3_PSK:   return "WPA2/3";
+    default:                        return "?";
+  }
+#endif
 }
 
 int quality(int rssi) {  // -100..-40 dBm -> 0..100 %
@@ -216,11 +306,20 @@ void rightText(const char* t, int xEnd, int y) {
 }
 
 // ---------- Scan ----------
+// Mulai scan async. ch=0 -> semua channel, ch>0 -> satu channel saja (cepat).
+void wifiScan(uint8_t ch) {
+#if defined(ESP8266)
+  WiFi.scanNetworks(true, true, ch);
+#else
+  WiFi.scanNetworks(true, true, false, 300, ch);
+#endif
+}
+
 // showScreen=true : tampilkan layar SCANNING
 // showScreen=false: scan di latar belakang, daftar lama tetap tampil
 void startScan(bool showScreen = true) {
   WiFi.scanDelete();
-  WiFi.scanNetworks(true, true);  // async, tampilkan hidden SSID
+  wifiScan(0);  // async, tampilkan hidden SSID
   if (showScreen) screen = SCR_SCANNING;
   else            bgScanning = true;
 }
@@ -411,7 +510,8 @@ void drawAbout() {
   display.setCursor(2, 34);
   display.print(b);
   display.setCursor(2, 44);
-  display.print("ESP8266 WiFi Scan");
+  snprintf(b, sizeof(b), "%s WiFi Scan", CHIP_NAME);
+  display.print(b);
   snprintf(b, sizeof(b), "RAM bebas %uKB", (unsigned)(ESP.getFreeHeap() / 1024));
   display.setCursor(2, 54);
   display.print(b);
@@ -515,7 +615,7 @@ void liveUpdate() {
   if (!liveScanRunning) {
     if (WiFi.scanComplete() == WIFI_SCAN_RUNNING) return;  // tunggu scan lama selesai
     WiFi.scanDelete();
-    WiFi.scanNetworks(true, true, n.ch);  // scan 1 channel saja = cepat
+    wifiScan(n.ch);  // scan 1 channel saja = cepat
     liveScanRunning = true;
     return;
   }
@@ -550,7 +650,7 @@ void setup() {
   batUpdate(true);
   cfgLoad();
 
-  Wire.begin(D2, D1);  // SDA, SCL
+  Wire.begin(PIN_SDA, PIN_SCL);
   Wire.setClock(400000);
   display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
   display.setTextWrap(false);
@@ -562,7 +662,7 @@ void setup() {
   WiFi.disconnect();
   delay(100);
 
-  randomSeed(analogRead(A0) + micros());
+  randomSeed(analogRead(BAT_PIN) + micros());
   bootAnimation();
   lastActivity = millis();
   screen = SCR_MENU;
