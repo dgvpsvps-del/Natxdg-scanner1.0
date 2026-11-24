@@ -3,6 +3,7 @@ on:
   push:
     paths-ignore:
       - "firmware/**"
+      - "**.md"
   workflow_dispatch:
 permissions:
   contents: write
