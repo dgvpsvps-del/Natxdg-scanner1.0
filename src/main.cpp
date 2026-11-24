@@ -27,6 +27,7 @@
 #include <EEPROM.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
+#include "logo.h"
 
 #define FW_NAME "Nat X Dg Scanner"
 #define FW_VER  "1.2"
@@ -296,79 +297,54 @@ void drawRow(int y, bool active, const char* left, const char* right) {
   if (right) rightText(right, SCREEN_W - 2, y);
 }
 
-// ---------- Boot bertema petir (Zeus) ----------
-void drawBoltIcon(int x, int y) {  // ikon petir 10x16
-  display.fillTriangle(x + 6, y, x, y + 9, x + 5, y + 9, SSD1306_WHITE);
-  display.fillTriangle(x + 4, y + 7, x + 9, y + 7, x + 3, y + 15, SSD1306_WHITE);
-}
-
+// ---------- Boot dengan logo DG ----------
 void flashScreen(int ms) {
   display.invertDisplay(true);
   delay(ms);
   display.invertDisplay(false);
 }
 
-void strikeBolt() {
+void drawLogoBig() {
   display.clearDisplay();
-  int x = 64 + random(-10, 11), y = 0;
-  while (y < SCREEN_H) {
-    int nx = constrain(x + random(-14, 15), 20, 108);
-    int ny = y + random(7, 13);
-    display.drawLine(x, y, nx, ny, SSD1306_WHITE);
-    display.drawLine(x + 1, y, nx + 1, ny, SSD1306_WHITE);
-    if (random(3) == 0)
-      display.drawLine(nx, ny, nx + random(-16, 17), ny + random(6, 12), SSD1306_WHITE);
-    x = nx;
-    y = ny;
-  }
+  display.drawBitmap((SCREEN_W - LOGO_BIG_W) / 2, (SCREEN_H - LOGO_BIG_H) / 2,
+                     LOGO_BIG, LOGO_BIG_W, LOGO_BIG_H, SSD1306_WHITE);
   display.display();
-  flashScreen(50);
 }
 
 void drawBoot(int pct) {
   pct = constrain(pct, 0, 100);
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
-  centerText("NAT X DG", 3, 2);
-  centerText("SCANNER", 21, 2);
-  drawBoltIcon(1, 8);
-  drawBoltIcon(117, 8);
-  int fillW = pct * 96 / 100;
-  display.drawRect(14, 42, 100, 8, SSD1306_WHITE);
-  display.fillRect(16, 44, fillW, 4, SSD1306_WHITE);
-  if (pct > 0 && pct < 100) {
-    int sx = 16 + fillW;
-    display.drawLine(sx, 40, sx + 3, 44, SSD1306_WHITE);
-    display.drawLine(sx + 3, 44, sx, 48, SSD1306_WHITE);
-    display.drawLine(sx, 48, sx + 3, 52, SSD1306_WHITE);
-  }
-  char t[20];
-  snprintf(t, sizeof(t), "POWER UP %d%%", pct);
-  centerText(t, 55, 1);
+  display.drawBitmap((SCREEN_W - LOGO_SMALL_W) / 2, 0,
+                     LOGO_SMALL, LOGO_SMALL_W, LOGO_SMALL_H, SSD1306_WHITE);
+  display.drawRect(14, 49, 100, 6, SSD1306_WHITE);
+  display.fillRect(16, 51, pct * 96 / 100, 2, SSD1306_WHITE);
+  centerText("NAT X DG SCANNER", 57, 1);
   display.display();
 }
 
-#define BOOT_STRIKE_MS 900
-#define BOOT_LOAD_MS   2000
+// Durasi boot total sekitar 3 detik (ubah sesuai selera)
+#define BOOT_LOGO_MS 1200  // logo besar
+#define BOOT_LOAD_MS 1800  // logo + loading bar
 
 void bootAnimation() {
   uint32_t t0 = millis();
-  while (millis() - t0 < BOOT_STRIKE_MS) {
-    strikeBolt();
-    delay(60);
+  for (int i = 0; i < 3; i++) {  // logo berkedip seperti petir lalu menyala
     display.clearDisplay();
     display.display();
-    delay(40 + random(80));
+    delay(50 + random(60));
+    drawLogoBig();
+    flashScreen(40);
+    delay(60);
   }
+  drawLogoBig();
+  while (millis() - t0 < BOOT_LOGO_MS) delay(10);
+
   t0 = millis();
-  bool f1 = false, f2 = false, f3 = false;
   while (true) {
-    uint32_t el = millis() - t0;
-    int p = constrain((int)(el * 100 / BOOT_LOAD_MS), 0, 100);
+    int p = constrain((int)((millis() - t0) * 100 / BOOT_LOAD_MS), 0, 100);
     drawBoot(p);
-    if (!f1 && p >= 40) { f1 = true; flashScreen(40); }
-    if (!f2 && p >= 80) { f2 = true; flashScreen(40); }
-    if (p >= 100) { if (!f3) { f3 = true; flashScreen(40); } break; }
+    if (p >= 100) break;
   }
   delay(150);
 }
