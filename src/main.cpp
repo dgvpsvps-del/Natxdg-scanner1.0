@@ -81,6 +81,14 @@ Screen screen = SCR_BOOT;
 int sel = 0, topIdx = 0;
 const int ROWS = 5;
 
+// auto scan
+#define AUTO_SCAN_MS 2000     // jeda antar scan otomatis (setelah scan sebelumnya selesai)
+bool     autoScan = true;     // AUTO aktif secara default
+bool     bgScanning = false;  // scan latar belakang sedang berjalan
+uint32_t lastScanDone = 0;
+uint32_t startDownAt = 0;     // untuk deteksi tap / tahan tombol Start
+bool     startLong = false;
+
 // live meter
 int      liveRssi = 0, liveMin = 0, liveMax = -200;
 bool     liveFound = false;
@@ -104,11 +112,12 @@ int quality(int rssi) {  // -100..-40 dBm -> 0..100 %
 }
 
 const char* strengthName(int rssi) {
-  if (rssi >= -50) return "SANGAT BAGUS";
+  // maksimal 6 huruf supaya muat di layar (tidak turun ke baris bawah)
+  if (rssi >= -50) return "MANTAP";
   if (rssi >= -60) return "BAGUS";
   if (rssi >= -70) return "CUKUP";
   if (rssi >= -80) return "LEMAH";
-  return "SANGAT LEMAH";
+  return "BURUK";
 }
 
 void shortText(char* out, const char* in, size_t maxChars) {
@@ -127,13 +136,20 @@ void centerText(const char* t, int y, uint8_t size) {
 }
 
 // ---------- Scan ----------
-void startScan() {
+// showScreen=true : tampilkan layar SCANNING (scan pertama)
+// showScreen=false: scan di latar belakang, daftar lama tetap tampil
+void startScan(bool showScreen = true) {
   WiFi.scanDelete();
   WiFi.scanNetworks(true, true);  // async, tampilkan hidden SSID
-  screen = SCR_SCANNING;
+  if (showScreen) screen = SCR_SCANNING;
+  else            bgScanning = true;
 }
 
-void collectScan(int n) {
+void collectScan(int n, bool keepSel) {
+  // ingat WiFi yang sedang dipilih supaya posisi kursor tidak loncat
+  uint8_t keep[6];
+  bool hadSel = keepSel && netCount > 0 && sel < netCount;
+  if (hadSel) memcpy(keep, netList[sel].bssid, 6);
   netCount = 0;
   for (int i = 0; i < n && netCount < MAX_NET; i++) {
     Net& e = netList[netCount];
@@ -158,7 +174,18 @@ void collectScan(int n) {
     netList[j + 1] = key;
   }
   sel = 0;
-  topIdx = 0;
+  if (hadSel) {
+    for (int i = 0; i < netCount; i++) {
+      if (memcmp(netList[i].bssid, keep, 6) == 0) { sel = i; break; }
+    }
+  } else {
+    topIdx = 0;
+  }
+  if (topIdx > sel) topIdx = sel;
+  if (sel >= topIdx + ROWS) topIdx = sel - ROWS + 1;
+  if (topIdx < 0) topIdx = 0;
+  bgScanning = false;
+  lastScanDone = millis();
   screen = SCR_LIST;
 }
 
@@ -264,10 +291,19 @@ void drawList() {
   display.setTextSize(1);
   display.setCursor(2, 1);
   display.print("WIFI LIST");
+  if (autoScan) {  // penanda AUTO
+    display.setCursor(62, 1);
+    display.print("AUTO");
+  }
   char cnt[8];
   snprintf(cnt, sizeof(cnt), "%d", netCount);
-  display.setCursor(SCREEN_W - 2 - strlen(cnt) * 6, 1);
+  int cx = SCREEN_W - 2 - strlen(cnt) * 6;
+  display.setCursor(cx, 1);
   display.print(cnt);
+  if (bgScanning) {  // penanda sedang scan
+    display.setCursor(cx - 8, 1);
+    display.print("*");
+  }
 
   if (netCount == 0) {
     display.setTextColor(SSD1306_WHITE);
@@ -349,12 +385,15 @@ void liveStart() {
   liveMin = liveMax = liveRssi;
   liveFound = true;
   liveScanRunning = false;
+  bgScanning = false;
+  startDownAt = 0;
   screen = SCR_DETAIL;
 }
 
 void liveUpdate() {
   Net& n = netList[sel];
   if (!liveScanRunning) {
+    if (WiFi.scanComplete() == WIFI_SCAN_RUNNING) return;  // tunggu scan lama selesai
     WiFi.scanDelete();
     WiFi.scanNetworks(true, true, n.ch);  // scan 1 channel saja = cepat
     liveScanRunning = true;
@@ -394,6 +433,7 @@ void setup() {
   display.begin(SSD1306_SWITCHCAPVCC, OLED_ADDR);
   display.clearDisplay();
 
+  display.setTextWrap(false);  // teks tidak turun ke baris bawah
   WiFi.persistent(false);
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
@@ -409,8 +449,8 @@ void loop() {
     case SCR_SCANNING: {
       drawScanning();
       int r = WiFi.scanComplete();
-      if (r >= 0) collectScan(r);
-      else if (r == WIFI_SCAN_FAILED) { netCount = 0; screen = SCR_LIST; }
+      if (r >= 0) collectScan(r, false);
+      else if (r == WIFI_SCAN_FAILED) { netCount = 0; lastScanDone = millis(); screen = SCR_LIST; }
       break;
     }
 
@@ -425,7 +465,30 @@ void loop() {
         redraw = true;
       }
       if (btnPressed(B_OK) && netCount > 0) { liveStart(); break; }
-      if (btnPressed(B_START)) { startScan(); break; }
+
+      // Start: tap = scan sekarang, tahan 0,9 detik = AUTO ON/OFF
+      if (btnPressed(B_START)) { startDownAt = millis(); startLong = false; }
+      if (btnState[B_START]) {
+        if (!startLong && startDownAt && millis() - startDownAt >= 900) {
+          startLong = true;
+          autoScan = !autoScan;
+          lastScanDone = millis();
+          redraw = true;
+        }
+      } else if (startDownAt) {
+        if (!startLong && !bgScanning) { startScan(false); redraw = true; }
+        startDownAt = 0;
+      }
+
+      // hasil scan di latar belakang / scan otomatis tiap 2 detik
+      if (bgScanning) {
+        int r = WiFi.scanComplete();
+        if (r >= 0) { collectScan(r, true); redraw = true; }
+        else if (r == WIFI_SCAN_FAILED) { bgScanning = false; lastScanDone = millis(); }
+      } else if (autoScan && millis() - lastScanDone >= AUTO_SCAN_MS) {
+        startScan(false);
+        redraw = true;
+      }
 
       if (sel < topIdx) topIdx = sel;
       if (sel >= topIdx + ROWS) topIdx = sel - ROWS + 1;
@@ -440,6 +503,9 @@ void loop() {
     case SCR_DETAIL: {
       if (btnPressed(B_BACK)) {
         WiFi.scanDelete();
+        bgScanning = false;
+        lastScanDone = millis();
+        startDownAt = 0;
         screen = SCR_LIST;
         drawList();
         break;

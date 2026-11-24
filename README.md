@@ -16,7 +16,7 @@ Firmware scan WiFi untuk ESP8266 / Wemos D1 mini + OLED 128x64 + 5 tombol (skema
 - **Up/Down** pilih WiFi (tahan = cepat)
 - **Confirm** buka Live Signal Meter (dBm real-time + MIN/MAX)
 - **Back** kembali ke daftar
-- **Start** scan ulang (di live meter: reset MIN/MAX)
+- **Start** tap = scan sekarang, **tahan ~1 detik = AUTO ON/OFF** (auto scan tiap 2 detik, default ON; tanda `AUTO` di header, `*` saat scanning). Di live meter: reset MIN/MAX
 
 ## Build .bin
 ```
