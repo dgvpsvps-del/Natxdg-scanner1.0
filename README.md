@@ -44,3 +44,9 @@ Salin `src/main.cpp` ke sketch `.ino`. Board: LOLIN(WEMOS) D1 R2 & mini. Library
 
 ## Durasi boot
 Atur `BOOT_STRIKE_MS` dan `BOOT_LOAD_MS` di `src/main.cpp` (default total ±3 detik).
+
+## Menu (v1.2)
+- **Scan WiFi** - daftar WiFi + dBm, auto-scan, live meter
+- **Setting** - Auto Scan ON/OFF, Interval (2/5/10 dtk), Kecerahan, Layar Mati (OFF/30dtk/1mnt/5mnt), Reset. Tersimpan otomatis saat tekan Back.
+- **About** - versi, tegangan/persen baterai, RAM bebas
+- Indikator baterai di header (A0). Kalau angkanya kurang pas, ubah `BAT_DIV` di `src/main.cpp`.
