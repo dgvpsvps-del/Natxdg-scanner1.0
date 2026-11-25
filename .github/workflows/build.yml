@@ -35,6 +35,10 @@ jobs:
           pack esp32s3 esp32s3 0x0    NatXDgScanner_ESP32-S3.bin
           pack esp32c3 esp32c3 0x0    NatXDgScanner_ESP32-C3.bin
           pack esp32c6 esp32c6 0x0    NatXDgScanner_ESP32-C6.bin
+          pack web_esp32   esp32   0x1000 NatXDgScanner-Web_ESP32.bin
+          pack web_esp32s3 esp32s3 0x0    NatXDgScanner-Web_ESP32-S3.bin
+          pack web_esp32c3 esp32c3 0x0    NatXDgScanner-Web_ESP32-C3.bin
+          pack web_esp32c6 esp32c6 0x0    NatXDgScanner-Web_ESP32-C6.bin
           ls -la firmware
       - uses: actions/upload-artifact@v4
         with:

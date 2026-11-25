@@ -79,3 +79,31 @@ Baterai pada ESP32: Vbat - 100k - pin ADC - 100k - GND (rasio 2:1, tegangan diba
 
 ## Build
 `pio run` (semua chip) atau `pio run -e esp32s3` (satu chip: esp8266, esp32, esp32s3, esp32c3, esp32c6).
+
+## Versi Web (ESP32 tanpa OLED, tanpa tombol)
+Firmware `NatXDgScanner-Web_*.bin` membuat ESP32 jadi scanner WiFi yang dibuka lewat browser, **tanpa internet** dan **tanpa pin apa pun** (cukup colok USB / power bank).
+
+| Chip | File .bin | Alamat flash |
+|---|---|---|
+| ESP32 | `NatXDgScanner-Web_ESP32.bin` | `0x0` |
+| ESP32-S3 | `NatXDgScanner-Web_ESP32-S3.bin` | `0x0` |
+| ESP32-C3 | `NatXDgScanner-Web_ESP32-C3.bin` | `0x0` |
+| ESP32-C6 | `NatXDgScanner-Web_ESP32-C6.bin` | `0x0` |
+
+**Cara pakai**
+1. Flash file `.bin` yang sesuai chip, lalu nyalakan ESP32.
+2. Di HP/laptop, sambungkan ke WiFi **`NatXDg-Scanner`**, password **`natxdg123`**.
+3. Buka **http://192.168.4.1** (atau **http://natxdg.local**). Di banyak HP halaman terbuka otomatis.
+
+**Isi halaman**
+- Daftar WiFi + kekuatan sinyal (dBm), urut sinyal / nama / channel, pencarian, filter sinyal lemah
+- Tap WiFi: grafik riwayat sinyal real-time + MIN / RATA-RATA / MAX (untuk mencari arah antena)
+- Tab **Channel**: grafik keramaian channel 1-13 + rekomendasi channel router
+- Auto scan 3 / 5 / 10 detik, export CSV, mode terang / gelap otomatis
+- Semua file halaman tertanam di firmware (tanpa CDN)
+
+**Catatan**
+- Saat scan berjalan (~2 detik), WiFi milik ESP32 bisa putus-nyambung sebentar. Itu normal untuk chip ber-radio tunggal; halaman menyambung lagi otomatis.
+- Ganti nama / password WiFi lewat `AP_SSID` dan `AP_PASS` di `src/web_main.cpp`. **Sebaiknya ganti password bawaan.**
+- Ubah tampilan di `web/index.html`, lalu jalankan `python3 tools/gen_web.py` untuk membuat ulang `src/web_page.h`.
+- Hanya membaca sinyal WiFi di sekitar (scan pasif), tidak menyambung ke atau mengganggu jaringan lain.
