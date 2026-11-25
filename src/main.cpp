@@ -28,7 +28,11 @@
   #include <WiFi.h>
 #endif
 #include <Wire.h>
-#include <EEPROM.h>
+#if defined(ESP8266)
+  #include <EEPROM.h>
+#else
+  #include <Preferences.h>
+#endif
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "logo.h"
@@ -169,14 +173,28 @@ void cfgDefault() {
   cfg.sleep = 0;
 }
 void cfgLoad() {
+#if defined(ESP8266)
   EEPROM.begin(16);
   EEPROM.get(0, cfg);
+#else
+  Preferences p;
+  p.begin("natxdg", true);
+  if (p.getBytes("cfg", &cfg, sizeof(cfg)) != sizeof(cfg)) cfg.magic = 0;
+  p.end();
+#endif
   if (cfg.magic != CFG_MAGIC || cfg.interval > 2 || cfg.bright > 2 || cfg.sleep > 3)
     cfgDefault();
 }
 void cfgSave() {
+#if defined(ESP8266)
   EEPROM.put(0, cfg);
   EEPROM.commit();
+#else
+  Preferences p;
+  p.begin("natxdg", false);
+  p.putBytes("cfg", &cfg, sizeof(cfg));
+  p.end();
+#endif
 }
 void applyBrightness() {
   display.ssd1306_command(SSD1306_SETCONTRAST);

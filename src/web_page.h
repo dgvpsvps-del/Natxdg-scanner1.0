@@ -83,6 +83,21 @@ header{display:flex;align-items:center;gap:12px;padding:18px 0 14px}
 .rec{margin-top:12px;padding:12px 14px;border-radius:14px;background:var(--card2);border:1px solid var(--bd);font-size:14px}
 .rec b{color:var(--g)}
 .hint{color:var(--mu);font-size:12.5px;margin:10px 2px 0}
+.acts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.acts .btn{padding:9px 14px;font-size:14px}
+.fld{display:block;margin:14px 0 0;font-size:13px;color:var(--mu)}
+.fld input{display:block;width:100%;margin-top:5px;background:var(--card2);border:1px solid var(--bd);border-radius:12px;padding:11px 12px;color:var(--tx);outline:none;font-size:16px}
+.fld input:focus{border-color:var(--acc1)}
+.fld input:disabled{opacity:.45}
+.chk{display:flex;gap:9px;align-items:center;margin-top:11px;font-size:14px}
+.chk input{width:18px;height:18px;accent-color:var(--acc1)}
+.msg{margin:14px 0 0;padding:10px 12px;border-radius:12px;background:var(--card2);font-size:13.5px}
+.msg.err{background:rgba(248,113,113,.16);color:var(--r)}
+.msg.ok{background:rgba(34,197,94,.16);color:var(--g)}
+.btns{display:flex;gap:8px;margin-top:16px}.btns .btn{flex:1}
+.qr{background:#fff;border-radius:16px;padding:12px;display:flex;justify-content:center}
+.qr img{width:min(300px,100%);height:auto;image-rendering:pixelated;display:block}
+.qn{text-align:center;font-size:14px;line-height:1.6;margin:12px 0 0}
 footer{margin-top:20px;text-align:center;color:var(--mu);font-size:12px;line-height:1.6}
 .sheet{position:fixed;inset:0;background:rgba(3,8,18,.62);display:none;align-items:flex-end;justify-content:center;z-index:9}
 .sheet.on{display:flex}
@@ -157,6 +172,11 @@ footer{margin-top:20px;text-align:center;color:var(--mu);font-size:12px;line-hei
     <div class="rec" id="rec"></div>
     <p class="hint">Tinggi batang = seberapa ramai channel itu (sinyal kuat dan channel bertetangga ikut dihitung). Angka kecil = jumlah WiFi di channel tersebut.</p>
   </section>
+
+  <div class="acts">
+    <button class="btn ghost" id="bCfg">⚙ Pengaturan WiFi</button>
+    <button class="btn ghost" id="bDon">♥ Donasi</button>
+  </div>
 
   <footer>
     <div id="info">&nbsp;</div>
@@ -313,6 +333,56 @@ function renderSheet(){
    +'<dl class="kv"><dt>Kualitas</dt><dd>'+qual(n.r)+"%</dd><dt>Channel</dt><dd>"+n.c+"</dd><dt>Keamanan</dt><dd>"+esc(n.e)+"</dd><dt>BSSID</dt><dd>"+esc(n.b)+"</dd><dt>Sampel</dt><dd>"+h.length+" pembacaan</dd></dl>";
 }
 
+function openPanel(html){st.sel=null;$("#panel").style.removeProperty("--c");$("#panel").innerHTML=html;$("#sheet").classList.add("on")}
+const X='<button class="x" id="xc" aria-label="Tutup">×</button>';
+
+function openDonate(){
+  openPanel('<div class="ph"><h2>Dukung proyek ini ♥</h2>'+X+'</div>'
+   +'<p class="hint" style="margin:8px 0 12px">Nat X Dg Scanner gratis dan open source. Kalau bermanfaat, traktir kopi lewat QRIS di bawah. Terima kasih!</p>'
+   +'<div class="qr"><img src="/donate.png" alt="QRIS DGVPS Abbay" width="300" height="300"></div>'
+   +'<p class="qn"><b>DGVPS ABBAY, DIGITAL &amp; KREATIF</b><br>NMID ID1026623182759 · SLEMAN<br>QRIS statis: isi nominal saat membayar</p>'
+   +'<p class="hint" style="text-align:center">Untuk membayar, HP perlu internet. Screenshot QR ini lalu bayar saat sudah online.</p>');
+}
+
+async function openCfg(){
+  let c={ssid:"",open:false,def:true};
+  try{c=await api("/api/config")}catch(e){}
+  openPanel('<div class="ph"><h2>Pengaturan WiFi alat</h2>'+X+'</div>'
+   +'<p class="hint" style="margin:8px 0 0">Nama dan password WiFi milik alat ini. Setelah disimpan alat restart, lalu sambungkan ulang HP ke WiFi yang baru.</p>'
+   +'<label class="fld">Nama WiFi<input id="cSsid" maxlength="32" autocomplete="off" value="'+esc(c.ssid)+'"></label>'
+   +'<label class="fld">Password (minimal 8 karakter)<input id="cPass" type="password" maxlength="63" autocomplete="new-password" placeholder="'+(c.open?"":"Kosongkan = tidak diubah")+'"></label>'
+   +'<label class="chk"><input type="checkbox" id="cShow"> Tampilkan password</label>'
+   +'<label class="chk"><input type="checkbox" id="cOpen"'+(c.open?" checked":"")+'> WiFi terbuka (tanpa password)</label>'
+   +'<div id="cMsg"></div>'
+   +'<div class="btns"><button class="btn" id="cSave">Simpan &amp; restart</button><button class="btn ghost" id="cReset">Bawaan</button></div>'
+   +'<p class="hint">Bawaan: <b>NatXDg-Scanner</b> / <b>12345678</b>. Lupa password? Tahan tombol BOOT alat selama 5 detik setelah menyala.</p>');
+  const msg=(t,k)=>{$("#cMsg").innerHTML='<div class="msg '+(k||"")+'">'+t+"</div>"};
+  const syncOpen=()=>{$("#cPass").disabled=$("#cOpen").checked};
+  syncOpen();
+  $("#cOpen").onchange=syncOpen;
+  $("#cShow").onchange=e=>{$("#cPass").type=e.target.checked?"text":"password"};
+  $("#cSave").onclick=async()=>{
+    const ssid=$("#cSsid").value.trim(),pass=$("#cPass").value,open=$("#cOpen").checked;
+    if(!ssid)return msg("Nama WiFi tidak boleh kosong","err");
+    if(new Blob([ssid]).size>32)return msg("Nama WiFi maksimal 32 byte","err");
+    if(!open&&pass&&pass.length<8)return msg("Password minimal 8 karakter","err");
+    if(!open&&!pass&&c.open)return msg("Isi password baru (minimal 8 karakter)","err");
+    $("#cSave").disabled=true;
+    try{
+      const r=await fetch("/api/config",{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},
+        body:new URLSearchParams({ssid:ssid,pass:pass,open:open?"1":"0"})});
+      const j=await r.json();
+      if(!j.ok){$("#cSave").disabled=false;return msg(esc(j.err||"Gagal menyimpan"),"err")}
+    }catch(e){}
+    msg("Tersimpan. Alat restart sekarang. Sambungkan HP ke WiFi <b>"+esc(ssid)+"</b>, lalu buka <b>http://192.168.4.1</b>.","ok");
+  };
+  $("#cReset").onclick=async()=>{
+    if(!confirm("Kembalikan nama & password WiFi ke bawaan (NatXDg-Scanner / 12345678)?"))return;
+    try{await fetch("/api/reset",{method:"POST"})}catch(e){}
+    msg("Dikembalikan ke bawaan. Alat restart; sambungkan ke <b>NatXDg-Scanner</b> (password <b>12345678</b>).","ok");
+  };
+}
+
 function openSheet(b){st.sel=b;$("#sheet").classList.add("on");renderSheet();if(!st.scanning)kick()}
 function closeSheet(){st.sel=null;$("#sheet").classList.remove("on")}
 
@@ -335,6 +405,7 @@ async function info(){
 $("#list").addEventListener("click",e=>{const r=e.target.closest(".row");if(r)openSheet(r.dataset.b)});
 $("#sheet").addEventListener("click",e=>{if(e.target.id==="sheet"||e.target.closest("#xc"))closeSheet()});
 document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSheet()});
+$("#bCfg").onclick=openCfg;$("#bDon").onclick=openDonate;
 $("#bScan").onclick=kick;$("#bCsv").onclick=csv;
 $("#auto").onchange=e=>{st.interval=+e.target.value;save();if(st.interval)kick()};
 $("#sort").onchange=e=>{st.sort=e.target.value;save();render()};

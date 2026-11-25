@@ -22,6 +22,7 @@ jobs:
           mkdir -p firmware
           rm -f firmware/*.bin
           cp .pio/build/esp8266/firmware.bin firmware/NatXDgScanner_ESP8266.bin
+          cp .pio/build/web_esp8266/firmware.bin firmware/NatXDgScanner-Web_ESP8266.bin
           BOOTAPP0=$(find ~/.platformio/packages -name boot_app0.bin | head -1)
           echo "boot_app0: $BOOTAPP0"
           pack() {  # env chip bootloader_offset output

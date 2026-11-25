@@ -80,19 +80,20 @@ Baterai pada ESP32: Vbat - 100k - pin ADC - 100k - GND (rasio 2:1, tegangan diba
 ## Build
 `pio run` (semua chip) atau `pio run -e esp32s3` (satu chip: esp8266, esp32, esp32s3, esp32c3, esp32c6).
 
-## Versi Web (ESP32 tanpa OLED, tanpa tombol)
-Firmware `NatXDgScanner-Web_*.bin` membuat ESP32 jadi scanner WiFi yang dibuka lewat browser, **tanpa internet** dan **tanpa pin apa pun** (cukup colok USB / power bank).
+## Versi Web (tanpa OLED, tanpa tombol) - ESP8266 & ESP32
+Firmware `NatXDgScanner-Web_*.bin` membuat alat jadi scanner WiFi yang dibuka lewat browser, **tanpa internet** dan **tanpa pin apa pun** (cukup colok USB / power bank).
 
 | Chip | File .bin | Alamat flash |
 |---|---|---|
+| ESP8266 / Wemos D1 mini | `NatXDgScanner-Web_ESP8266.bin` | `0x0` |
 | ESP32 | `NatXDgScanner-Web_ESP32.bin` | `0x0` |
 | ESP32-S3 | `NatXDgScanner-Web_ESP32-S3.bin` | `0x0` |
 | ESP32-C3 | `NatXDgScanner-Web_ESP32-C3.bin` | `0x0` |
 | ESP32-C6 | `NatXDgScanner-Web_ESP32-C6.bin` | `0x0` |
 
 **Cara pakai**
-1. Flash file `.bin` yang sesuai chip, lalu nyalakan ESP32.
-2. Di HP/laptop, sambungkan ke WiFi **`NatXDg-Scanner`**, password **`natxdg123`**.
+1. Flash file `.bin` yang sesuai chip, lalu nyalakan alat.
+2. Di HP/laptop, sambungkan ke WiFi **`NatXDg-Scanner`**, password **`12345678`** (bawaan).
 3. Buka **http://192.168.4.1** (atau **http://natxdg.local**). Di banyak HP halaman terbuka otomatis.
 
 **Isi halaman**
@@ -100,10 +101,23 @@ Firmware `NatXDgScanner-Web_*.bin` membuat ESP32 jadi scanner WiFi yang dibuka l
 - Tap WiFi: grafik riwayat sinyal real-time + MIN / RATA-RATA / MAX (untuk mencari arah antena)
 - Tab **Channel**: grafik keramaian channel 1-13 + rekomendasi channel router
 - Auto scan 3 / 5 / 10 detik, export CSV, mode terang / gelap otomatis
+- **Pengaturan WiFi alat**: ganti nama dan password WiFi langsung dari halaman (tersimpan di flash)
 - Semua file halaman tertanam di firmware (tanpa CDN)
 
+**Ganti nama / password WiFi alat**
+Buka halaman, tekan **Pengaturan WiFi**, isi nama dan password baru (min. 8 karakter), lalu **Simpan & restart**. Sambungkan ulang HP ke WiFi yang baru. Boleh juga dibuat terbuka tanpa password.
+
+**Lupa password?** Tahan tombol **BOOT** (GPIO0; di ESP32-C3/C6 GPIO9) selama 5 detik setelah alat menyala. Di Wemos D1 mini, sambungkan pin **D3 ke GND** selama 5 detik. Alat kembali ke `NatXDg-Scanner` / `12345678`.
+
 **Catatan**
-- Saat scan berjalan (~2 detik), WiFi milik ESP32 bisa putus-nyambung sebentar. Itu normal untuk chip ber-radio tunggal; halaman menyambung lagi otomatis.
-- Ganti nama / password WiFi lewat `AP_SSID` dan `AP_PASS` di `src/web_main.cpp`. **Sebaiknya ganti password bawaan.**
+- Saat scan berjalan (~2 detik), WiFi milik alat bisa putus-nyambung sebentar. Itu normal untuk chip ber-radio tunggal; halaman menyambung lagi otomatis.
+- Sebaiknya ganti password bawaan sebelum dipakai di tempat ramai.
 - Ubah tampilan di `web/index.html`, lalu jalankan `python3 tools/gen_web.py` untuk membuat ulang `src/web_page.h`.
 - Hanya membaca sinyal WiFi di sekitar (scan pasif), tidak menyambung ke atau mengganggu jaringan lain.
+
+## Donasi
+Proyek ini gratis. Kalau bermanfaat, kamu bisa mendukung lewat QRIS di bawah (juga tersedia di halaman web alat: tombol **Donasi**). Terima kasih!
+
+<p align="center"><img src="docs/donate-qris.png" width="280" alt="QRIS DGVPS Abbay"></p>
+
+**DGVPS ABBAY, DIGITAL & KREATIF** - NMID ID1026623182759 - SLEMAN (QRIS statis: isi nominal saat membayar)
